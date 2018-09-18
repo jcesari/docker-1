@@ -1,0 +1,1 @@
+docker service create --replicas 2 --name engineering-bay --network overmind --env OC_USERNAME=jcesari --env OC_PASSWD=jcesari 42school/engineering-bay
