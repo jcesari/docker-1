@@ -1,29 +1,34 @@
 FROM ubuntu:16.04
 
-RUN apt-get update -q \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-	ca-certificates \
-	openssh-server \
+EXPOSE 80 22
+
+RUN apt-get update -y && \
+	apt-get upgrade -y
+
+RUN apt-get install -y	sudo \
+	openssh-client \
 	curl \
-	postfix
+	openssh-server \
+	ca-certificates \
+	tzdata
 
-WORKDIR /
-RUN curl -LO https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh
+RUN mkdir -p /opt/gitlab/sv/sshd/supervise \
+	&& mkfifo /opt/gitlab/sv/sshd/supervise/ok \
+	&& printf "#!/bin/sh\nexec 2>&1\numask 077\nexec /usr/sbin/sshd -D" > /opt/gitlab/sv/sshd/run \
+	&& chmod a+x /opt/gitlab/sv/sshd/run \
+	&& ln -s /opt/gitlab/sv/sshd /opt/gitlab/service \
+	&& mkdir -p /var/run/sshd
 
-RUN bash script.deb.sh
+RUN curl https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
 
-RUN apt-get update && EXTERNAL_URL="http://gitlab.example.com" apt-get install -yq gitlab-ce
+RUN apt install -y gitlab-ce
 
-# Missing Time Zone Data /usr/share/zoneinfo
-# https://gitlab.com/gitlab-org/omnibus-gitlab/issues/2229
-RUN apt update && apt install -y tzdata && \
-	apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN echo "external_url \"http://localhost/\"" > /etc/gitlab/gitlab.rb
 
-EXPOSE 22 8000
+ADD start.sh /root/start.sh
 
-ADD https://gist.githubusercontent.com/jcesari/4dc7358e9db3eba1a44b58f6713614d0/raw/35bd71b5c7a468f0a56921b0db432b08a9d10c6c/start.sh start.sh
-RUN chmod +x /start.sh
+RUN chmod +x /root/start.sh
 
-CMD [ "bash", "/start.sh" ]
+ENTRYPOINT	/root/start.sh
 #docker build -t ubu .
-#docker run -it --rm -p 80:80 -p 21:22 --privileged ubu
+#docker run -it --rm -p 8000:80 -p 21:22 --privileged ubu
